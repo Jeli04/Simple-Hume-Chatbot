@@ -1,4 +1,0 @@
-langchain 
-openai
-hume
-pinecone-client
