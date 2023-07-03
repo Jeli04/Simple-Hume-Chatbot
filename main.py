@@ -83,27 +83,27 @@ async def stream_emotion():
     start_time = time.time()
     emotion = ""
     async with client.connect([config]) as socket:
-        while recording:
+        while recording:     # modifiy this line too allow continous streaming
             # record emotion
             current_time = time.time()
             elapsed_time = current_time - start_time
 
-            print("detecting emotion")
+            # print("detecting emotion")
             ret, frame = cap.read()
             _, frame_bytes = cv2.imencode('.jpg', frame)
             frame_base64 = base64.b64encode(frame_bytes.tobytes())
             result = await socket.send_bytes(frame_base64)
                     
             # interval is the time
-            if(elapsed_time >= 1):
+            if(elapsed_time >= 2):
                 if "warning" in result["face"]:
                     if emotion == "":
                         emotion = "neutral"    
-                    print("No face detected")
+                    # print("No face detected")
                 else:
                     async with lock:
                         emotion = streaming.get_likely_emotion(result["face"]["predictions"][0]["emotions"])
-                        print(emotion)
+                        # print(emotion)
         
                 start_time = current_time
 
