@@ -57,7 +57,7 @@ async def emotion_stream(lock : asyncio, socket : HumeStreamClient, cap:cv2.Vide
             
     # interval is the time
     emotion = ""
-    if(elapsed_time >= 5):
+    if(elapsed_time >= 2):
         if "warning" in result["face"]:
             print("No face detected")
         else:

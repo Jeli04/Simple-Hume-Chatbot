@@ -18,7 +18,7 @@ import struct
 import time
 import cv2
 import os
-
+import base64
 from interpret import interpret
 
 env_vars = dotenv_values('.env')
@@ -40,6 +40,15 @@ recorder = PvRecorder(device_index=1, frame_length=512)
 recording = False
 audio = []
 
+# For the hume stream
+lock = asyncio.Lock()
+start_time = time.time()
+client = HumeStreamClient(env_vars['HUMEAI_API'])
+config = FaceConfig(identify_faces=True)
+cap = cv2.VideoCapture(0)
+emotion = ""
+
+
 def record_voice():
     global recorder, recording, audio
     while recording:
@@ -56,7 +65,7 @@ def record_voice():
     audio = [] # reset audio
 
     # call the interpret function 
-    result = interpret("output.wav")
+    result = interpret("output.wav", emotion=emotion)
     os.remove("output.wav")
     
     # play the result 
@@ -67,6 +76,40 @@ def record_voice():
     playsound("result.mp3")
     os.remove("result.mp3")
 
+# modify the code so the steam stops when space bar is hit
+async def stream_emotion():
+    global emotion, lock, start_time, client, config, cap, recording
+
+    start_time = time.time()
+    emotion = ""
+    async with client.connect([config]) as socket:
+        while recording:
+            # record emotion
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            print("detecting emotion")
+            ret, frame = cap.read()
+            _, frame_bytes = cv2.imencode('.jpg', frame)
+            frame_base64 = base64.b64encode(frame_bytes.tobytes())
+            result = await socket.send_bytes(frame_base64)
+                    
+            # interval is the time
+            if(elapsed_time >= 1):
+                if "warning" in result["face"]:
+                    if emotion == "":
+                        emotion = "neutral"    
+                    print("No face detected")
+                else:
+                    async with lock:
+                        emotion = streaming.get_likely_emotion(result["face"]["predictions"][0]["emotions"])
+                        print(emotion)
+        
+                start_time = current_time
+
+ 
+def run_stream_emotion_in_thread():
+    asyncio.run(stream_emotion())
 
 def on_key_press(key):
     global recorder, recording
@@ -83,6 +126,7 @@ def on_key_press(key):
             print("Recording....")
             recording = True
             recorder.start()  
+            threading.Thread(target=run_stream_emotion_in_thread).start()
             threading.Thread(target=record_voice).start()
 
 async def main():
